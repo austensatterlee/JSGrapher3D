@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script type="text/javascript" src="../calc.js"></script>
+    <script type="text/javascript" src="../libs/jquery-1.9.1.js"></script>
+    <script type="text/javascript">
+        function runTest(){
+            var result = parse_exp($('#input').val());
+            $('#output').text(result.toString());
+        }
+    </script>
+</head>
+<body>
+        <textarea oninput="runTest()" id="input"> </textarea>
+        <div id="output"></div>
+</body>
+</html>

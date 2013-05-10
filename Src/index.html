@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>Grapher.js</title>
+        <link rel="stylesheet" type="text/css" href="app.css">
+        <link rel="stylesheet" type="text/css" href="jquery-ui-1.10.3.custom/css/dot-luv/jquery-ui-1.10.3.custom.css">
+	</head>
+	<body onload='load()'>
+
+    <div id="userInput">
+        <h3>Equation</h3>
+        <div id="equation_tab">
+            <!--<input type="text" id="eqIn0" oninput="changeEq(0)" />-->
+            <button id="addEq_btn" onclick="addSurface()">+</button>
+        </div>
+        <h3>Settings</h3>
+        <div id="changeBounds">
+            <span><label>Y-min</label><input type="text" id="Y_MIN"></span>
+            <span><label>Y-max</label><input type="text" id="Y_MAX"></span>
+            <span><label>X-min</label><input type="text" id="X_MIN"></span>
+            <span><label>X-max</label><input type="text" id="X_MAX"></span>
+            <span><label>Z-min</label><input type="text" id="Z_MIN"></span>
+            <span><label>Z-max</label><input type="text" id="Z_MAX"></span>
+            <!--<span><label>Label spacing</label><input type="text" id="LABEL_SPACING"></span>-->
+            <span><label>Sample spacing</label><input type="text" id="P_SPACING"></span>
+            <span><button onclick="changeBounds()">Go!</button></span>
+            <span><label>Axes Opacity: <div id="opacitySlider_value">1.0</div></label><div id="axesOpacity_slider"></div></span>
+        </div>
+    </div>
+
+    <div id="container"></div>
+
+	</body>
+
+    <script type="x-shader/x-fragment" id="fragmentshader">
+
+        #ifdef GL_ES
+        precision highp float;
+        #endif
+
+        varying vec3 pos;
+        varying vec3 vNormal;
+        varying vec4 vColor;
+
+        uniform float elapsedTime;
+        uniform vec3 cameraPos;
+
+        void main()
+        {
+        // colour is RGBA: u, v, 0, 1
+        vec3 light = vec3(0.0,5.0,0.0);
+        //light.y = 25.0+10.0*cos(elapsedTime);
+        float lightBrightness = 0.750;
+        float camLen = sqrt(pow(cameraPos.x,2.0)+pow(cameraPos.y,2.0)+pow(cameraPos.z,2.0));
+        float lightLen = sqrt(pow(light.y,2.0));//float lightLen = sqrt(pow(light.x,2.0)+pow(light.y,2.0)+pow(light.z,2.0));
+        float lightDist = sqrt(pow(pos.y-light.y,2.0));//float lightDist = sqrt(pow(pos.x-light.x,2.0)+pow(pos.y-light.y,2.0)+pow(pos.z-light.z,2.0));
+        float camDist = sqrt(pow(pos.x-cameraPos.x,2.0)+pow(pos.y-cameraPos.y,2.0)+pow(pos.z-cameraPos.z,2.0));
+        gl_FragColor = vec4(lightBrightness*lightLen/lightDist,lightBrightness*lightLen/lightDist,lightBrightness*lightLen/lightDist,lightLen/lightDist);
+        //gl_FragColor = vec4(abs(normalize(pos)),1.0);//
+        }
+
+    </script>
+    <!-- End Shaders -->
+
+	<script src="libs/jquery-1.9.1.js"></script>
+    <script src="jquery-ui-1.10.3.custom/js/jquery-ui-1.10.3.custom.js"></script>
+	<script src="libs/Three.js"></script>
+    <script src="libs/THREEx.WindowResize.js"></script>
+    <script src="libs/gl-matrix.js"></script>
+
+    <script type="text/javascript" src="setups.js"></script>
+    <script type="text/javascript" src="controls.js"></script>
+    <script type="text/javascript" src="calc.js"></script>
+    <script type="text/javascript" src="app.js"></script>
+</html>
