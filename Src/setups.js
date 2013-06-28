@@ -13,18 +13,53 @@ function makeBoundingBox(){
 
     Z_GEOMETRY = new THREE.PlaneGeometry(Z_DISPLACE,Y_DISPLACE,Z_DISPLACE,Y_DISPLACE);
 
-    var material = new THREE.MeshBasicMaterial( {color: 0xFFFFFF,wireframe:true,transparent:true, opacity: 1.0, blending: THREE.NormalBlending } );
+
+    var material = new THREE.MeshBasicMaterial( {color: 0xFFFFFF,wireframe:true,transparent:true, opacity: parseFloat($("#opacitySlider_value").text()), blending: THREE.NormalBlending } );
 
     var X_MESH = new THREE.Mesh(X_GEOMETRY, material);
     var Z_MESH = new THREE.Mesh(Z_GEOMETRY, material);
-    X_MESH.position.set(X_DISPLACE/2+AxesBounds["X_MIN"],Y_DISPLACE/2+AxesBounds["Y_MIN"],0);
-    Z_MESH.position.set(0,Y_DISPLACE/2+AxesBounds["Y_MIN"],Z_DISPLACE/2+AxesBounds["Z_MIN"]);
+//    X_MESH.position.set(X_DISPLACE/2+AxesBounds["X_MIN"],Y_DISPLACE/2+AxesBounds["Y_MIN"],0);
+//    Z_MESH.position.set(0,Y_DISPLACE/2+AxesBounds["Y_MIN"],Z_DISPLACE/2+AxesBounds["Z_MIN"]);
+    Z_MESH.position.set(AxesBounds["X_MIN"],Y_DISPLACE/2+AxesBounds["Y_MIN"],(AxesBounds["Z_MIN"]+AxesBounds["Z_MAX"])/2);
+    X_MESH.position.set((AxesBounds["X_MIN"]+AxesBounds["X_MAX"])/2,Y_DISPLACE/2+AxesBounds["Y_MIN"],AxesBounds["Z_MIN"]);
     Z_MESH.rotation.set(0,Math.PI/2,0);
 
     return [X_MESH,Z_MESH];
 }
 
-function makeAxisLabels(){
+function makeAxesLines(){
+    var X_DISPLACE = AxesBounds["X_MAX"]-AxesBounds["X_MIN"];
+    var Z_DISPLACE = AxesBounds["Z_MAX"]-AxesBounds["Z_MIN"];
+    var Y_DISPLACE = AxesBounds["Y_MAX"]-AxesBounds["Y_MIN"];
+
+    var x_arrow = new THREE.ArrowHelper(new THREE.Vector3(AxesBounds["X_MAX"],0,0),new THREE.Vector3(AxesBounds["X_MIN"],0,0));
+    var z_arrow = new THREE.ArrowHelper(new THREE.Vector3(0,0,AxesBounds["Z_MAX"]),new THREE.Vector3(0,0,AxesBounds["Z_MIN"]));
+    var y_arrow = new THREE.ArrowHelper(new THREE.Vector3(0,AxesBounds["Y_MAX"],0),new THREE.Vector3(0,AxesBounds["Y_MIN"],0));
+
+    var X_GEOMETRY = new THREE.CylinderGeometry(0.05,0.05,X_DISPLACE,4,X_DISPLACE,false);
+    var Z_GEOMETRY = new THREE.CylinderGeometry(0.05,0.05,Z_DISPLACE,4,Z_DISPLACE,false);
+    var Y_GEOMETRY = new THREE.CylinderGeometry(0.05,0.05,Y_DISPLACE,4,Y_DISPLACE,false);
+
+    var x_material = new THREE.MeshBasicMaterial({color:0xFFFF99,wireframe:false,transparent:true,opacity:1.0});
+    var z_material = new THREE.MeshBasicMaterial({color:0xFF99FF,wireframe:false,transparent:true,opacity:1.0});
+    var y_material = new THREE.MeshBasicMaterial({color:0x99FFFF,wireframe:false,transparent:true,opacity:1.0});
+
+    var X_AXIS = new THREE.Mesh(X_GEOMETRY,x_material);
+    var Z_AXIS = new THREE.Mesh(Z_GEOMETRY,z_material);
+    var Y_AXIS = new THREE.Mesh(Y_GEOMETRY,y_material);
+
+    X_AXIS.position.set(AxesBounds["X_MIN"]+X_DISPLACE/2,0,0);
+    Z_AXIS.position.set(0,0,AxesBounds["Z_MIN"]+Z_DISPLACE/2);
+    Y_AXIS.position.set(0,AxesBounds["Y_MIN"]+Y_DISPLACE/2,0);
+
+    X_AXIS.rotation.set(0,0,Math.PI/2);
+    Z_AXIS.rotation.set(Math.PI/2,0,0);
+    Y_AXIS.rotation.set(0,0,0);
+
+    return [Y_AXIS,X_AXIS,Z_AXIS];
+}
+
+function makeAxisLabels_old(){
     var labels = [];
     /* Make XZ-axis labels */
     var XZ_NUM = (AxesBounds["XZ_MAX"]-AxesBounds["XZ_MIN"])/AxesBounds["LABEL_SPACING"];
@@ -84,18 +119,35 @@ function setupInput(){
         active: false,
         heightStyle: "content"
     });
-    $("button").button();
+    $("#addEq_btn").button({icons: {
+        primary: "ui-icon-circle-plus"
+    },text:false});
+
+    $("#remEq_btn").button({icons: {
+        primary: "ui-icon-circle-minus"
+    },text:false});
+    $("#remEq_btn").css({'background': '#a32d00'});
+
     addSurface();
     $("#axesOpacity_slider").slider({
         min:0.0,
         max:1.0,
         value:1.0,
         step: 0.1,
-        slide: changeAxesOpacity
+        slide: changeAxesOpacity_event
     })
 
     for(var i=0;i<Object.keys(AxesBounds).length;i++){
         $("#"+Object.keys(AxesBounds)[i]).val(AxesBounds[Object.keys(AxesBounds)[i]]);
+    }
+
+    /* set up lighting variables from lighting dictionary */
+    var $lightTab = $("#lighting_tab");
+    for(var i=0;i<Object.keys(LightingVars).length;i++){
+        var currKey = Object.keys(LightingVars)[i];
+        var currVal = LightingVars[currKey];
+        $("<span><label>"+currKey+"</label><input type='text' id='"+currKey+"' oninput=\"updateLighting('"+currKey+"')\"></span>").appendTo($lightTab);
+        $("#"+currKey).val(currVal);
     }
 }
 
@@ -109,19 +161,31 @@ function makeFunctionMesh(vShaderArray,dispOptsStr){
 
     var dispOpts = dispOptsStr.split(",");
     // create the grid's material
-    basicMaterial = new THREE.MeshLambertMaterial(
-        {
-            color: 0xFFAAAAFF,
-            blending: THREE.AdditiveBlending,
-            transparent: false
-        });
+
+    var X_DISPLACE = -AxesBounds["X_MIN"];//+(AxesBounds["X_MAX"]-AxesBounds["X_MIN"])/2;
+    var Z_DISPLACE = -AxesBounds["Z_MIN"];//+(AxesBounds["Z_MAX"]-AxesBounds["Z_MIN"])/2;
+    /* Todo: fix vertex placement for boundary values indivisible by P_SPACING */
+    var xNum = Math.ceil((AxesBounds["X_MAX"]-AxesBounds["X_MIN"])/AxesBounds["P_SPACING"]);
+    var zNum = Math.ceil((AxesBounds["Z_MAX"]-AxesBounds["Z_MIN"])/AxesBounds["P_SPACING"]);
+
     shaderMaterial = new THREE.ShaderMaterial({
         uniforms: {
             elapsedTime: {type: 'f', value: 0},
-            cameraPos: {type: 'v3', value: [0,0,0]}
+            cameraPos: {type: 'v3', value: [0,0,0]},
+            spacing: {type: 'f', value: AxesBounds["P_SPACING"]},
+            uNum: {type: 'f', value: xNum},
+            vNum: {type: 'f', value: zNum},
+            Y_BOUNDS: {type: 'v2',value: [AxesBounds.Y_MIN,AxesBounds.Y_MAX]},
+            currHighlighted: {type: 'v2', value: []},
+            /* Lighting uniforms */
+            DIFFUSE_POWER: {type: 'f', value: 1.0},
+            SPECULAR_POWER: {type: 'f', value: 1.0},
+            SPECULAR_HARDNESS: {type: 'f', value: 1.0},
+            LIGHT_Y : {type: 'f', value: 20.0}
         },
         attributes: {
-            parameters: {type: 'v2', value: [0,0]}
+            parameters: {type: 'v3', value: []},
+            highlight: {type: 'v3', value: []}
         },
         vertexShader: vShaderArray.join(''),
         fragmentShader: $("#fragmentshader").text(),
@@ -131,35 +195,25 @@ function makeFunctionMesh(vShaderArray,dispOptsStr){
     })
 
     gridGeometry = new THREE.Geometry();
-    var X_DISPLACE = -AxesBounds["X_MIN"];//+(AxesBounds["X_MAX"]-AxesBounds["X_MIN"])/2;
-    var Z_DISPLACE = -AxesBounds["Z_MIN"];//+(AxesBounds["Z_MAX"]-AxesBounds["Z_MIN"])/2;
-    var xNum = (AxesBounds["X_MAX"]-AxesBounds["X_MIN"])/AxesBounds["P_SPACING"];
-    var zNum = (AxesBounds["Z_MAX"]-AxesBounds["Z_MIN"])/AxesBounds["P_SPACING"];
     var count=0;
-    //var P_NUM = 500;
-    for(var i=0;i<xNum;i+=1){
-        for(var j=0;j<zNum;j+=1){
+    for(var i=0;i<=xNum;i+=1){
+        for(var j=0;j<=zNum;j+=1){
             var x=i*AxesBounds["P_SPACING"];
             var z=j*AxesBounds["P_SPACING"];
-            var xNext = (i+1)*AxesBounds["P_SPACING"];
-            var zNext= (j+1)*AxesBounds["P_SPACING"];
-            gridGeometry.vertices.push(new THREE.Vector3(x-X_DISPLACE,0,zNext-Z_DISPLACE));
-            shaderMaterial.attributes.parameters.value.push(new THREE.Vector2(x-X_DISPLACE,zNext-Z_DISPLACE));
+            gridGeometry.vertices.push(new THREE.Vector3(x-X_DISPLACE,count,z-Z_DISPLACE));
+            shaderMaterial.attributes.parameters.value.push(new THREE.Vector3(i,j,count));
+            shaderMaterial.attributes.highlight.value.push(new THREE.Vector3(0,0,0));
+            if(i>0&&j>0){
+                gridGeometry.faces.push(new THREE.Face3(count,count-1,count-zNum-1,new THREE.Vector3(0,1,0)));
+                gridGeometry.faces.push(new THREE.Face3(count-zNum-1,count-1,count,new THREE.Vector3(0,-1,0)));
 
-            gridGeometry.vertices.push(new THREE.Vector3(xNext-X_DISPLACE,0,zNext-Z_DISPLACE));
-            shaderMaterial.attributes.parameters.value.push(new THREE.Vector2(xNext-X_DISPLACE,zNext-Z_DISPLACE));
-
-            gridGeometry.vertices.push(new THREE.Vector3(xNext-X_DISPLACE,0,z-Z_DISPLACE));
-            shaderMaterial.attributes.parameters.value.push(new THREE.Vector2(xNext-X_DISPLACE,z-Z_DISPLACE));
-
-            gridGeometry.vertices.push(new THREE.Vector3(x-X_DISPLACE,0,z-Z_DISPLACE));
-            shaderMaterial.attributes.parameters.value.push(new THREE.Vector2(x-X_DISPLACE,z-Z_DISPLACE));
-
-            gridGeometry.faces.push(new THREE.Face4(count,count+1,count+2,count+3,new THREE.Vector3(0,1,0)));
-            gridGeometry.faces.push(new THREE.Face4(count+3,count+2,count+1,count,new THREE.Vector3(0,-1,0)));
-            count+=4;
+                gridGeometry.faces.push(new THREE.Face3(count-1,count-zNum-2,count-zNum-1,new THREE.Vector3(0,1,0)));
+                gridGeometry.faces.push(new THREE.Face3(count-zNum-1,count-zNum-2,count-1,new THREE.Vector3(0,-1,0)));
+            }
+            count+=1;
         }
     }
+
     var gridObjPS;
     if(dispOpts.indexOf("ps")==-1)
         gridObjPS = new THREE.Mesh(gridGeometry, shaderMaterial );
@@ -169,5 +223,9 @@ function makeFunctionMesh(vShaderArray,dispOptsStr){
     gridObjPS.position.set(0,0,0);
     gridObjPS.vShaderArray = vShaderArray.slice(0);
     gridObjPS.dispOptsStr = dispOptsStr;
+    gridObjPS.material.uniforms.currHighlighted.value = new THREE.Vector2(1.0,1.0);
+    gridObjPS.material.uniforms.currHighlighted.needsUpdate = true;
+    //gridObjPS.xNum = xNum;
+    //gridObjPS.zNum = zNum;
     return gridObjPS;
 }

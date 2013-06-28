@@ -12,7 +12,13 @@ var AxesBounds={
     "Z_MAX" : 10,
     "Z_MIN" : -10,
     "LABEL_SPACING" : 1,
-    "P_SPACING" : 0.125
+    "P_SPACING" : 0.1
+}
+
+var LightingVars={
+    DIFFUSE_POWER: 5.0,
+    SPECULAR_POWER: 1.0,
+    SPECULAR_HARDNESS: 10.0
 }
 
 var CAM_RAD = Math.sqrt(Math.pow(AxesBounds["X_MAX"],2)+Math.pow(AxesBounds["Z_MAX"],2))/(Math.PI/4)*3;
@@ -39,10 +45,17 @@ var vertexShaderStr =[
     "#endif\n",
     "varying vec3 pos;\n",
     "varying vec3 vNormal;\n",
-    "varying vec4 vColor;\n",
+    "varying vec3 vParameters;\n",
+    "varying vec3 vHighlight;\n",
     "uniform float elapsedTime;\n",
     "uniform vec3 cameraPos;\n",
-    "attribute vec2 parameters;\n",
+    "uniform float spacing;\n",
+    "uniform float uNum;\n",
+    "uniform float vNum;\n",
+    "uniform vec2 Y_BOUNDS;\n",
+    "uniform vec2 currHighlighted;\n",
+    "attribute vec3 parameters;\n",
+    "attribute vec3 highlight;\n",
     "vec3 computeNewPos(vec3 oldPos){\n",
     "float x = oldPos.x;\n",
     "float y = oldPos.y;\n",
@@ -55,15 +68,16 @@ var vertexShaderStr =[
     ");\n}",
     "vec3 computeNormal(){\n",
     "    vec3 curr = computeNewPos(position);\n",
-    "    vec3 dX = computeNewPos(position+vec3(0.1,0,0));\n",
-    "    vec3 dZ = computeNewPos(position+vec3(0,0,0.1));\n",
-    "    vec3 n = cross((dZ-curr)/0.1,(dX-curr)/0.1);",
+    "    vec3 dX = computeNewPos(position+vec3(spacing,0,0));\n",
+    "    vec3 dZ = computeNewPos(position+vec3(0,0,spacing));\n",
+    "    vec3 n = cross((dZ-curr)/spacing,(dX-curr)/spacing);",
     "    return n;\n",
     "}\n",
     "void main(){\n",
     "vec3 newPos = computeNewPos(position);\n",
-    //"vNormal = computeNormal();\n",
-    //"vColor = color;\n",
+    "vNormal = computeNormal();\n",
+    "vParameters = parameters;\n",
+    "vHighlight = highlight;\n",
     "pos = newPos;\n",
     "float camDist = abs(pow(cameraPos.x,2.0)+pow(cameraPos.y,2.0)+pow(cameraPos.z,2.0));\n",
     "float dist = abs(pow(pos.x-cameraPos.x,2.0)+pow(pos.y-cameraPos.y,2.0)+pow(pos.z-cameraPos.z,2.0));",
@@ -86,7 +100,7 @@ var Timer = function(timeSpeed){
 var AppTimer = new Timer(.001);
 
 
-var renderer, camera, scene, surfaceMeshes, boundingBox, labels;
+var renderer, camera, scene, surfaceMeshes, axesLines, boundingBox, labels;
 
 function load(){
     WIDTH = window.innerWidth;
@@ -117,13 +131,14 @@ function load(){
     scene = new THREE.Scene();
 
     surfaceMeshes = [];
+    axesLines = makeAxesLines();
     boundingBox = makeBoundingBox();
     labels = [];//makeAxisLabels();
 
     // and the camera
     scene.add(camera);
-    scene.add(boundingBox[0]);
-    scene.add(boundingBox[1]);
+    axesLines.forEach(function(e){scene.add(e)});
+    boundingBox.forEach(function(e){scene.add(e)});
     for(var i=0;i<labels.length;i++){
         scene.add(labels[i]);
     }
@@ -139,18 +154,28 @@ function load(){
     /* Begin draw loop */
     requestAnimationFrame(draw);
 }
-
+var count=0;
 function draw(){
     /* Give updated elapsed time to shader */
     if(USE_SHADERS){
         for(var i=0;i<surfaceMeshes.length;i++){
             surfaceMeshes[i].material.uniforms.elapsedTime.value = AppTimer.getElapsed();
             surfaceMeshes[i].material.uniforms.cameraPos.value = camera.position;
+            surfaceMeshes[i].material.uniforms.Y_BOUNDS.value = new THREE.Vector2(AxesBounds.Y_MIN,AxesBounds.Y_MAX);
+            /* update lighting */
+            for(var j=0;j<Object.keys(LightingVars).length;j++){
+                var currKey = Object.keys(LightingVars)[j];
+                var currVal = LightingVars[currKey];
+                surfaceMeshes[i].material.uniforms[currKey].value = currVal;
+            }
         }
     }
+    count+=5;
+    if(count>surfaceMeshes[0].geometry.vertices.length)
+        count=0;
+    surfaceMeshes[0].material.uniforms.currHighlighted.value = new THREE.Vector2(surfaceMeshes[0].geometry.vertices[count].x,surfaceMeshes[0].geometry.vertices[count].z);
     // draw!
     renderer.render(scene, camera);
-    $('#camConsole').text("Camera pos: "+camera.position.x+", "+camera.position.y+", "+camera.position.z+" elapsed: "+AppTimer.getElapsed());
     requestAnimationFrame(draw);
 }
 
@@ -163,10 +188,10 @@ function changeEq(meshNum){
 
 function changeEq_Shader(meshNum){
     var meshNum = parseInt(meshNum);
-    var EQ_LINE = 15;
+    var EQ_LINE = 22;
     var VAR_MAPPING = {'x':0,'y':2,'z':4};
     var newEq = $("#eqIn"+meshNum).val();
-    var system = newEq.split(",");
+    var system = newEq.split(";");
     /* Set to defaults first */
     var vertexShaderArray = surfaceMeshes[meshNum].vShaderArray;
     vertexShaderArray[EQ_LINE+VAR_MAPPING['x']]='x';
@@ -174,7 +199,6 @@ function changeEq_Shader(meshNum){
     vertexShaderArray[EQ_LINE+VAR_MAPPING['z']]='z';
     for(var i=0;i<system.length;i++){
         var eqArray = system[i].split("=");
-        console.log(eqArray);
         if(eqArray.length>1){
             var eq = eqArray[1];
             eq = eq.replace(/u/g,"x");
@@ -183,7 +207,6 @@ function changeEq_Shader(meshNum){
         }
     }
     surfaceMeshes[meshNum].material.vertexShader = vertexShaderArray.join('');
-    console.log(surfaceMeshes[meshNum].material.vertexShader);
     surfaceMeshes[meshNum].material.needsUpdate = true;
     AppTimer.reset();
 }
@@ -196,6 +219,5 @@ function changeEq_Manual(){
         surfaceMeshes.geometry.vertices[i].y = 10*Math.sin(.25*x+t)+10*Math.cos(.25*z+t);
     }
     surfaceMeshes.geometry.verticesNeedUpdate = true;
-
 }
 

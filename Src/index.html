@@ -12,7 +12,10 @@
         <h3>Equation</h3>
         <div id="equation_tab">
             <!--<input type="text" id="eqIn0" oninput="changeEq(0)" />-->
-            <button id="addEq_btn" onclick="addSurface()">+</button>
+            <span id="addRemEq_span">
+                <button id="remEq_btn" onclick='deleteSurface()'>-</button>
+                <button id="addEq_btn" onclick='addSurface()'>+</button>
+            </span>
         </div>
         <h3>Settings</h3>
         <div id="changeBounds">
@@ -26,6 +29,10 @@
             <span><label>Sample spacing</label><input type="text" id="P_SPACING"></span>
             <span><button onclick="changeBounds()">Go!</button></span>
             <span><label>Axes Opacity: <div id="opacitySlider_value">1.0</div></label><div id="axesOpacity_slider"></div></span>
+        </div>
+        <h3>Lighting</h3>
+        <div id="lighting_tab">
+
         </div>
     </div>
 
@@ -42,22 +49,54 @@
         varying vec3 pos;
         varying vec3 vNormal;
         varying vec4 vColor;
+        varying vec3 vParameters;
+        varying vec3 vHighlight;
 
         uniform float elapsedTime;
         uniform vec3 cameraPos;
+        uniform vec2 currHighlighted;
+        uniform float uNum;
+        uniform float vNum;
+
+        uniform vec2 Y_BOUNDS;
+
+        uniform float DIFFUSE_POWER;
+        uniform float SPECULAR_POWER;
+        uniform float SPECULAR_HARDNESS;
+
+
+        float rand(vec2 co){
+            return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+        }
 
         void main()
         {
-        // colour is RGBA: u, v, 0, 1
-        vec3 light = vec3(0.0,5.0,0.0);
-        //light.y = 25.0+10.0*cos(elapsedTime);
-        float lightBrightness = 0.750;
-        float camLen = sqrt(pow(cameraPos.x,2.0)+pow(cameraPos.y,2.0)+pow(cameraPos.z,2.0));
-        float lightLen = sqrt(pow(light.y,2.0));//float lightLen = sqrt(pow(light.x,2.0)+pow(light.y,2.0)+pow(light.z,2.0));
-        float lightDist = sqrt(pow(pos.y-light.y,2.0));//float lightDist = sqrt(pow(pos.x-light.x,2.0)+pow(pos.y-light.y,2.0)+pow(pos.z-light.z,2.0));
-        float camDist = sqrt(pow(pos.x-cameraPos.x,2.0)+pow(pos.y-cameraPos.y,2.0)+pow(pos.z-cameraPos.z,2.0));
-        gl_FragColor = vec4(lightBrightness*lightLen/lightDist,lightBrightness*lightLen/lightDist,lightBrightness*lightLen/lightDist,lightLen/lightDist);
-        //gl_FragColor = vec4(abs(normalize(pos)),1.0);//
+        //light stuffs
+        vec3 light = vec3(0.0,Y_BOUNDS.y,0.0);
+        //light.x = 5.0*cos(elapsedTime);
+        //light.z = 5.0*sin(elapsedTime);
+        vec3 diffuseColor = vec3(1.0,0.5,0.5);
+        vec3 specularColor = vec3(1.0,1.0,1.0);
+        float diffusePower = DIFFUSE_POWER;
+        float specularPower = SPECULAR_POWER;
+        float specularHardness = SPECULAR_HARDNESS; //?
+        //calculations
+        vec3 N = normalize(vNormal);
+        vec3 L = normalize(light-pos);
+        vec3 V = normalize(cameraPos-pos);
+        vec3 H = normalize(L+V);
+        float distance = distance(light,pos);
+        float intDiffuse = clamp(dot(vNormal,L),0.0,1.0);
+        float intSpecular = pow(clamp(dot(vNormal,H),0.0,1.0),specularHardness);
+        vec3 diffuse = intDiffuse * diffuseColor * diffusePower / distance;
+        vec3 specular = intSpecular * specularColor * specularPower / distance;
+        vec3 ambient = vec3(0.2,0.2,0.2);
+        //gl_FragColor = vec4(vec3(vParameters.z/100.0),1.0);
+        //gl_FragColor = vec4(lightColor*vec3(1.0)*1.0/(2.0*3.1415926)*acos(dot(pos-light,vNormal)/(length(pos-light)*length(vNormal))),1.0);
+        gl_FragColor = vec4(ambient+specular+diffuse,1.0);
+        if(pos.y>Y_BOUNDS.y || pos.y<Y_BOUNDS.x){
+            discard;
+        }
         }
 
     </script>

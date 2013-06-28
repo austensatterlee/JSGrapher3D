@@ -31,9 +31,10 @@ div, canvas{overflow: hidden} /* Removes scroll bars */
 }
 
 #equation_tab input[type=text]{
-    width:300px;
+    width:250px;
+    /*height: auto;*/
 }
 
 #equation_tab button{
-     display: block;
+     /*display: inline;*/
 }

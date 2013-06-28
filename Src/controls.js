@@ -50,6 +50,7 @@ var mouseButtons=[];
 var mouseClickPos = vec2.fromValues(0,0);
 
 var onMouseDown = function(event){
+    event.preventDefault();
     mouseButtons.push(event.button+1);
     lastMousePos = null;
     vec2.set(dVar,0,0);
@@ -82,6 +83,7 @@ var dMousePos = vec2.create();
 var dVar = vec2.fromValues(0,0);
 
 var onMouseMove = function(event){
+    event.preventDefault();
     var currMousePos = vec2.fromValues(event.pageX,event.pageY);
     var dMousePosDir = vec2.create();
     var dMousePosSqr = vec2.create();
@@ -93,11 +95,10 @@ var onMouseMove = function(event){
         if(mouseButtons.indexOf(MouseEnum.LEFT)!=-1){
             camAngles.theta = (camAngles.finalTheta-(dMousePos[0]));
             camAngles.phi = (camAngles.finalPhi+(dMousePos[1]));
-            camAngles.phi = Math.min( 180, Math.max( 0, camAngles.phi ) );
+            camAngles.phi = Math.min( 180, Math.max( -180, camAngles.phi ) );
             var theta = camAngles.theta * Math.PI / 360;
             var phi = camAngles.phi * Math.PI / 360;
 
-            $("#genConsole").text("dMouse: "+"<"+dMousePos[0]+","+dMousePos[1]+">, Theta: "+camAngles.theta+" Phi: "+camAngles.phi);
             camera.position.z = CAM_RAD * Math.cos(phi)*Math.cos(theta);
             camera.position.x = CAM_RAD * Math.cos(phi)*Math.sin(theta);
             camera.position.y = CAM_RAD * Math.sin(phi);
@@ -153,24 +154,25 @@ function changeBounds(){
         var newVal = $("#"+Object.keys(AxesBounds)[i]).val();
         AxesBounds[Object.keys(AxesBounds)[i]] = parseFloat(newVal);
     }
-    console.log(AxesBounds);
-    scene.remove(boundingBox[0]);
-    scene.remove(boundingBox[1]);
+    axesLines.forEach(function(e){scene.remove(e)});
+    boundingBox.forEach(function(e){scene.remove(e)});
     for(var i=0;i<labels.length;i++){
         scene.remove(labels[i]);
     }
     for(var i=0;i<surfaceMeshes.length;i++){
-        scene.remove(surfaceMeshes[i]);
-    }
-
-    for(var i=0;i<surfaceMeshes.length;i++){
-        surfaceMeshes[i] = makeFunctionMesh(surfaceMeshes[i].vShaderArray,surfaceMeshes[i].dispOptsStr);
+        var currMesh = surfaceMeshes[i];
+        surfaceMeshes[i] = makeFunctionMesh(currMesh.vShaderArray,currMesh.dispOptsStr);
+        scene.remove(currMesh);
+        delete(currMesh);
         scene.add(surfaceMeshes[i]);
     }
+
+    axesLines = makeAxesLines();
     boundingBox = makeBoundingBox();
     // add the mesh to the scene
-    scene.add(boundingBox[0]);
-    scene.add(boundingBox[1]);
+    axesLines.forEach(function(e){scene.add(e)});
+    boundingBox.forEach(function(e){scene.add(e)});
+    changeAxesOpacity($("#axesOpacity_slider").slider("value"));
 }
 
 var BTN_CSS = {'font' : 'inherit',
@@ -181,19 +183,29 @@ var BTN_CSS = {'font' : 'inherit',
 
 function addSurface(){
     var surfaceNum = surfaceMeshes.length;
+    $newEqSpan = $("<span id='eqInSpan"+surfaceNum+"'></span>");
+    $newEqSpan.insertBefore('#addRemEq_span');
+
     $newEqIn = $("<input type='text' id='eqIn"+surfaceNum+"' oninput='changeEq("+surfaceNum+")'>");
-    $newEqIn.insertBefore('#addEq_btn');
-    $newEqIn.button().css(BTN_CSS);
+    $newEqIn.appendTo($newEqSpan);
 
     $newDispSelector = $("<select id='eqDispSel"+surfaceNum+"' onchange='updateSurfaceMaterial("+surfaceNum+")'>"
     +"<option value='normal'>normal</option>"
     +"<option value='wireframe'>wireframe</option>"
     +"<option value='ps'>particles</option>"
     +"</select>");
-    $newDispSelector.insertAfter($newEqIn);
+    $newDispSelector.appendTo($newEqSpan);
+
     var newMesh = makeFunctionMesh();
     surfaceMeshes.push(newMesh);
     scene.add(newMesh);
+}
+
+function deleteSurface(){
+    var surfNum = surfaceMeshes.length-1;
+    $("#eqInSpan"+surfNum).remove();
+    scene.remove(surfaceMeshes[surfNum]);
+    delete(surfaceMeshes.pop());
 }
 
 function updateSurfaceMaterial(meshNum){
@@ -203,10 +215,26 @@ function updateSurfaceMaterial(meshNum){
     scene.add(surfaceMeshes[meshNum]);
 }
 
-function changeAxesOpacity(event, ui){
+function changeAxesOpacity_event(event, ui){
     $("#opacitySlider_value").text(ui.value);
-    boundingBox[0].material.opacity = ui.value;
-    boundingBox[0].material.needsUpdate = true;
-    boundingBox[1].material.opacity = ui.value;
-    boundingBox[1].material.needsUpdate = true;
+    changeAxesOpacity(ui.value);
+}
+
+function changeAxesOpacity(value){
+    axesLines.forEach(
+        function(e){
+            e.material.opacity = value;
+            e.material.needsUpdate = true;
+        });
+    boundingBox.forEach(
+        function(e){
+            e.material.opacity = value;
+            e.material.needsUpdate = true;
+        });
+}
+
+function updateLighting(lightingVar){
+    for(var i=0;i<surfaceMeshes.length;i++){
+        LightingVars[lightingVar] = $("#"+lightingVar).val();
+    }
 }
