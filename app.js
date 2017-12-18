@@ -175,7 +175,10 @@ function draw(){
         count=0;
     surfaceMeshes[0].material.uniforms.currHighlighted.value = new THREE.Vector2(surfaceMeshes[0].geometry.vertices[count].x,surfaceMeshes[0].geometry.vertices[count].z);
     // draw!
-    renderer.render(scene, camera);
+    try {
+        renderer.render(scene, camera);
+    } catch (e) {
+    }
     requestAnimationFrame(draw);
 }
 
